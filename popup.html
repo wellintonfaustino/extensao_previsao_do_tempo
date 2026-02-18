@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Previsão do Tempo</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Font Awesome para ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+  <div class="weather-app">
+    <header>
+      <div class="search-bar">
+        <i class="fa-solid fa-location-dot location-icon"></i>
+        <input type="text" id="city-input" placeholder="Buscar cidade..." autocomplete="off">
+        <button id="search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+      </div>
+    </header>
+
+    <main class="weather-info" id="weather-info">
+      <div class="loading-state" id="loading">
+        <div class="loader"></div>
+        <p>Detectando localização...</p>
+      </div>
+
+      <div class="weather-content hidden" id="weather-content">
+        <h2 class="city-name" id="city-name">--</h2>
+        <div class="current-weather">
+          <div class="icon-container">
+            <i class="fa-solid fa-cloud-sun weather-icon" id="weather-icon"></i>
+          </div>
+          <div class="temp-container">
+            <span class="temperature" id="temperature">--</span>
+            <span class="unit">°C</span>
+          </div>
+          <p class="condition" id="condition">--</p>
+        </div>
+
+        <div class="details-grid">
+          <div class="detail-card">
+            <i class="fa-solid fa-wind"></i>
+            <span class="detail-value" id="wind-speed">-- km/h</span>
+            <span class="detail-label">Vento</span>
+          </div>
+          <div class="detail-card">
+            <i class="fa-solid fa-droplet"></i>
+            <span class="detail-value" id="humidity">--%</span>
+            <span class="detail-label">Umidade</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="error-msg hidden" id="error-msg">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <p id="error-text">Não foi possível carregar os dados.</p>
+        <button class="retry-btn" id="retry-btn">Tentar Novamente</button>
+      </div>
+    </main>
+  </div>
+  <script src="popup.js"></script>
+</body>
+
+</html>
