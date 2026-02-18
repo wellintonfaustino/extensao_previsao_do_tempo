@@ -143,7 +143,7 @@ async function handleSearch() {
 
 async function fetchWeather(lat, lon, name) {
   try {
-    const url = `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&wind_speed_unit=kmh&timezone=auto`;
+    const url = `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,weather_code,precipitation_probability,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&wind_speed_unit=kmh&timezone=auto`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error("API Error");
@@ -173,6 +173,12 @@ async function fetchWeather(lat, lon, name) {
     
     dom.weatherIcon.className = ''; 
     dom.weatherIcon.classList.add('fa-solid', weatherInfo.icon, 'weather-icon');
+    
+    // Atualizar background
+    updateBackground(code, current.is_day);
+
+    // Show content first to ensure canvas has dimensions for getBoundingClientRect
+    showContent();
 
     // Render forecasts
     if (data.hourly) {
@@ -180,8 +186,6 @@ async function fetchWeather(lat, lon, name) {
         drawTemperatureChart(data.hourly, current.time); // Desenhar gráfico
     }
     if (data.daily) renderDailyForecast(data.daily);
-
-    showContent();
   } catch (err) {
     console.error(err);
     showError("Erro ao carregar clima.");
@@ -351,14 +355,9 @@ function drawTemperatureChart(hourly, currentTime) {
     // Iniciar caminho
     ctx.beginPath();
     
-    // Desenhar curva suave (Spline simples)
-    // Para simplificar, vamos desenhar linhas retas conectadas, ou b-spline
-    // Sendo JS puro, vamos usar lines mesmo, mas com strokeCurve depois se der
-    // Tentar quadraticCurveTo para suavizar
-    
     ctx.moveTo(getX(0), getY(temps[0]));
 
-    for (let i = 0; i < temps.length - 1; i++) {
+    for (let i = 0; i < temps.length - 1; i++) { // Loop corrigido para ir até length - 1
         const xCurrent = getX(i);
         const yCurrent = getY(temps[i]);
         const xNext = getX(i + 1);
@@ -368,29 +367,27 @@ function drawTemperatureChart(hourly, currentTime) {
         const xMid = (xCurrent + xNext) / 2;
         const yMid = (yCurrent + yNext) / 2;
         
-        if (i === 0) {
-           ctx.lineTo(xMid, yMid); // Line to first mid
-        } else {
-           ctx.quadraticCurveTo(xCurrent, yCurrent, xMid, yMid);
-        }
+        // Bezier quadrática para suavização
+        ctx.quadraticCurveTo(xCurrent, yCurrent, xMid, yMid);
     }
     
-    // Último ponto
+    // Conectar ao último ponto
     ctx.lineTo(getX(temps.length - 1), getY(temps[temps.length - 1]));
     
     // Desenhar a linha
     ctx.stroke();
     
-    // Preencher a área abaixo
+    // Preencher a área abaixo (gradiente)
     ctx.lineTo(getX(temps.length - 1), height);
     ctx.lineTo(getX(0), height);
     ctx.closePath();
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    // Desenhar bolinhas em alguns pontos (a cada 4 horas)
+    // Desenhar bolinhas em alguns pontos
     ctx.fillStyle = '#fff';
-    for (let i = 0; i < temps.length; i += 4) {
+    const interval = Math.floor(temps.length / 5); // Mostrar ~5 pontos
+    for (let i = 0; i < temps.length; i += interval) {
         const x = getX(i);
         const y = getY(temps[i]);
         
@@ -399,10 +396,40 @@ function drawTemperatureChart(hourly, currentTime) {
         ctx.fill();
         
         // Texto da temperatura
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.font = '10px sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = '12px Outfit, sans-serif'; // Fonte maior
         ctx.textAlign = 'center';
-        ctx.fillText(`${temps[i]}°`, x, y - 8);
+        ctx.fillText(`${temps[i]}°`, x, y - 10);
         ctx.fillStyle = '#fff';
     }
+}
+
+function updateBackground(code, isDay) {
+  const body = document.body;
+  body.className = ''; // Reset
+  
+  // Códigos WMO
+  // 0,1: Limpo/Parcial
+  // 2,3: Nublado
+  // 45,48: Nevoeiro
+  // 51-67, 80-82: Chuva
+  // 71-77, 85-86: Neve
+  // 95-99: Tempestade
+
+  if (isDay === 0) {
+    body.classList.add('bg-night');
+    return;
+  }
+
+  if (code <= 1) {
+    body.classList.add('bg-sunny');
+  } else if (code <= 3 || code === 45 || code === 48) {
+    body.classList.add('bg-cloudy');
+  } else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+    body.classList.add('bg-rainy');
+  } else if (code >= 95) {
+    body.classList.add('bg-storm');
+  } else {
+    body.classList.add('bg-cloudy'); // Fallback
+  }
 }

@@ -4,17 +4,45 @@
 :root {
   /* Palette - Premium Dark Weather Theme */
   --bg-gradient: linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-  --card-bg: rgba(255, 255, 255, 0.08);
-  --card-border: rgba(255, 255, 255, 0.1);
-  --glass-highlight: rgba(255, 255, 255, 0.15);
+  --chart-line: #ffd700;
+
+  --bg-sunny: linear-gradient(180deg, #2980b9 0%, #6dd5fa 100%);
+  --bg-cloudy: linear-gradient(180deg, #606c88 0%, #3f4c6b 100%);
+  --bg-rainy: linear-gradient(180deg, #373b44 0%, #4286f4 100%);
+  --bg-storm: linear-gradient(180deg, #141e30 0%, #243b55 100%);
+  --bg-night: linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+
+  --card-bg: rgba(255, 255, 255, 0.1);
+  --card-border: rgba(255, 255, 255, 0.15);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
 
   --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.6);
-  --accent: #4facfe;
-  --accent-glow: rgba(79, 172, 254, 0.4);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --accent: #ffffff;
+  --accent-glow: rgba(255, 255, 255, 0.3);
 
-  --chart-line: #ffd700;
-  --chart-fill: rgba(255, 215, 0, 0.1);
+  --chart-fill: rgba(255, 255, 255, 0.1);
+}
+
+/* Background Classes */
+body.bg-sunny {
+  background: var(--bg-sunny);
+}
+
+body.bg-cloudy {
+  background: var(--bg-cloudy);
+}
+
+body.bg-rainy {
+  background: var(--bg-rainy);
+}
+
+body.bg-storm {
+  background: var(--bg-storm);
+}
+
+body.bg-night {
+  background: var(--bg-night);
 }
 
 * {
