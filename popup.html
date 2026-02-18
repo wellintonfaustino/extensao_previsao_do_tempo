@@ -65,6 +65,11 @@
             <canvas id="tempChart"></canvas>
           </div>
 
+          <h3>Probabilidade de Chuva</h3>
+          <div class="chart-container">
+            <canvas id="rainChart"></canvas>
+          </div>
+
           <h3>Detalhes Horários</h3>
           <div class="hourly-container" id="hourly-forecast">
             <!-- Items injected by JS -->
@@ -86,6 +91,8 @@
         <button class="retry-btn" id="retry-btn">Tentar Novamente</button>
       </div>
     </main>
+
+    <div id="chart-tooltip" class="chart-tooltip hidden"></div>
   </div>
   <script src="popup.js"></script>
 </body>

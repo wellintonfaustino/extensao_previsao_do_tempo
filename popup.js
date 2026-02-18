@@ -40,7 +40,10 @@ const dom = {
   retryBtn: document.getElementById('retry-btn'),
   hourlyContainer: document.getElementById('hourly-forecast'),
   dailyContainer: document.getElementById('daily-forecast'),
-  chartCanvas: document.getElementById('tempChart') // Novo
+  dailyContainer: document.getElementById('daily-forecast'),
+  chartCanvas: document.getElementById('tempChart'),
+  rainCanvas: document.getElementById('rainChart'),
+  tooltip: document.getElementById('chart-tooltip') // Novo
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -183,7 +186,8 @@ async function fetchWeather(lat, lon, name) {
     // Render forecasts
     if (data.hourly) {
         renderHourlyForecast(data.hourly, current.time);
-        drawTemperatureChart(data.hourly, current.time); // Desenhar gráfico
+        drawTemperatureChart(data.hourly, current.time);
+        drawRainChart(data.hourly, current.time); // Desenhar gráfico de chuva
     }
     if (data.daily) renderDailyForecast(data.daily);
   } catch (err) {
@@ -319,7 +323,8 @@ function drawTemperatureChart(hourly, currentTime) {
     // Configurar dimensões internas
     const width = rect.width;
     const height = rect.height;
-    const padding = { top: 20, bottom: 20, left: 10, right: 10 };
+    // Aumentar padding para não cortar números
+    const padding = { top: 30, bottom: 30, left: 20, right: 20 };
     
     // Limpar
     ctx.clearRect(0, 0, width, height);
@@ -357,18 +362,21 @@ function drawTemperatureChart(hourly, currentTime) {
     
     ctx.moveTo(getX(0), getY(temps[0]));
 
-    for (let i = 0; i < temps.length - 1; i++) { // Loop corrigido para ir até length - 1
+    for (let i = 0; i < temps.length - 1; i++) {
         const xCurrent = getX(i);
         const yCurrent = getY(temps[i]);
         const xNext = getX(i + 1);
         const yNext = getY(temps[i + 1]);
         
-        // Ponto de controle para curva suave (ponto médio)
+        // Bezier quadrática para suavização
         const xMid = (xCurrent + xNext) / 2;
         const yMid = (yCurrent + yNext) / 2;
         
-        // Bezier quadrática para suavização
-        ctx.quadraticCurveTo(xCurrent, yCurrent, xMid, yMid);
+        if (i === 0) {
+            ctx.lineTo(xMid, yMid);
+        } else {
+            ctx.quadraticCurveTo(xCurrent, yCurrent, xMid, yMid);
+        }
     }
     
     // Conectar ao último ponto
@@ -378,15 +386,17 @@ function drawTemperatureChart(hourly, currentTime) {
     ctx.stroke();
     
     // Preencher a área abaixo (gradiente)
+    ctx.save();
     ctx.lineTo(getX(temps.length - 1), height);
     ctx.lineTo(getX(0), height);
     ctx.closePath();
     ctx.fillStyle = gradient;
     ctx.fill();
+    ctx.restore();
 
     // Desenhar bolinhas em alguns pontos
     ctx.fillStyle = '#fff';
-    const interval = Math.floor(temps.length / 5); // Mostrar ~5 pontos
+    const interval = Math.floor(temps.length / 6); // Ajustado intervalo
     for (let i = 0; i < temps.length; i += interval) {
         const x = getX(i);
         const y = getY(temps[i]);
@@ -396,12 +406,120 @@ function drawTemperatureChart(hourly, currentTime) {
         ctx.fill();
         
         // Texto da temperatura
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.font = '12px Outfit, sans-serif'; // Fonte maior
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.font = 'bold 12px Outfit, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`${temps[i]}°`, x, y - 10);
+        // Ajustar posição do texto para não cortar (se estiver muito perto do topo)
+        const textY = y - 12 < 10 ? y + 20 : y - 12;
+        ctx.fillText(`${temps[i]}°`, x, textY);
         ctx.fillStyle = '#fff';
     }
+}
+
+/**
+ * Desenha gráfico de barras para chuva
+ */
+function drawRainChart(hourly, currentTime) {
+    const canvas = dom.rainCanvas;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    
+    // Ajustar resolução
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    ctx.scale(dpr, dpr);
+    
+    const width = rect.width;
+    const height = rect.height;
+    const padding = { top: 20, bottom: 20, left: 20, right: 20 };
+    
+    ctx.clearRect(0, 0, width, height);
+
+    // Dados (24h)
+    const startIndex = hourly.time.findIndex(t => t === currentTime);
+    const start = startIndex !== -1 ? startIndex : 0;
+    const sliceCount = 24;
+    const props = hourly.precipitation_probability.slice(start, start + sliceCount);
+    
+    if (props.length === 0) return;
+
+    // Config barra
+    const barWidth = (width - padding.left - padding.right) / props.length;
+    const maxVal = 100; // Porcentagem sempre vai até 100
+
+    // Gradiente das barras
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, '#4facfe');
+    gradient.addColorStop(1, '#00f2fe');
+
+    ctx.fillStyle = gradient;
+
+    for(let i=0; i < props.length; i++) {
+        const val = props[i];
+        if (val === 0) continue; // Pular barras vazias
+
+        const barHeight = (val / maxVal) * (height - padding.top - padding.bottom);
+        const x = padding.left + (i * barWidth);
+        const y = height - padding.bottom - barHeight;
+        
+        // Desenhar barra (com leve arredondamento no topo)
+        ctx.beginPath();
+        ctx.roundRect(x + 1, y, barWidth - 2, barHeight, [2, 2, 0, 0]);
+        ctx.fill();
+    }
+    
+    // Labels (em intervalos)
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '10px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    
+    const interval = 6; // A cada 6 horas
+    for(let i=0; i < props.length; i+= interval) {
+        const x = padding.left + (i * barWidth) + (barWidth/2);
+        
+        // Hora
+        const date = new Date(hourly.time[start + i]);
+        const hour = date.getHours().toString().padStart(2, '0');
+        
+        ctx.fillText(`${hour}h`, x, height - 5);
+        
+        // Valor se for relevante (>30%)
+    // Interatividade: Tooltip
+    // Remover ouvintes antigos para evitar duplicação (embora redefinir onmousemove funcione bem)
+    canvas.onmousemove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        
+        // Calcular índice da barra
+        // x = padding.left + (i * barWidth)
+        // i = (x - padding.left) / barWidth
+        const index = Math.floor((mouseX - padding.left) / barWidth);
+        
+        if (index >= 0 && index < props.length) {
+            const prob = props[index];
+            const date = new Date(hourly.time[start + index]);
+            const hour = date.getHours().toString().padStart(2, '0') + ':00';
+            
+            // Mostrar tooltip
+            dom.tooltip.innerHTML = `<strong>${hour}</strong><br>Chuva: ${prob}%`;
+            dom.tooltip.style.left = `${e.clientX}px`;
+            dom.tooltip.style.top = `${e.clientY}px`;
+            dom.tooltip.classList.remove('hidden');
+            
+            // Opcional: Destacar barra (requer redesenhar, pode ser pesado. Vamos focar no tooltip por enquanto)
+        } else {
+            dom.tooltip.classList.add('hidden');
+        }
+    };
+
+    canvas.onmouseleave = () => {
+        dom.tooltip.classList.add('hidden');
+    };
 }
 
 function updateBackground(code, isDay) {
