@@ -28,27 +28,54 @@
 
       <div class="weather-content hidden" id="weather-content">
         <h2 class="city-name" id="city-name">--</h2>
+        <p class="today-date" id="today-date">--</p>
+
         <div class="current-weather">
-          <div class="icon-container">
+          <div class="hero-stats">
             <i class="fa-solid fa-cloud-sun weather-icon" id="weather-icon"></i>
+            <div class="temp-container">
+              <span class="temperature" id="temperature">--°</span>
+              <p class="condition" id="condition">--</p>
+            </div>
           </div>
-          <div class="temp-container">
-            <span class="temperature" id="temperature">--</span>
-            <span class="unit">°C</span>
-          </div>
-          <p class="condition" id="condition">--</p>
         </div>
 
         <div class="details-grid">
           <div class="detail-card">
             <i class="fa-solid fa-wind"></i>
-            <span class="detail-value" id="wind-speed">-- km/h</span>
+            <span class="detail-value" id="wind-speed">--</span>
             <span class="detail-label">Vento</span>
           </div>
           <div class="detail-card">
             <i class="fa-solid fa-droplet"></i>
             <span class="detail-value" id="humidity">--%</span>
             <span class="detail-label">Umidade</span>
+          </div>
+          <div class="detail-card">
+            <i class="fa-solid fa-cloud-rain"></i>
+            <span class="detail-value" id="precip-prob">--%</span>
+            <span class="detail-label">Chuva</span>
+          </div>
+        </div>
+
+        <!-- Hourly Chart & List -->
+        <div class="forecast-section">
+          <h3>Temperatura nas próximas 24h</h3>
+          <div class="chart-container">
+            <canvas id="tempChart"></canvas>
+          </div>
+
+          <h3>Detalhes Horários</h3>
+          <div class="hourly-container" id="hourly-forecast">
+            <!-- Items injected by JS -->
+          </div>
+        </div>
+
+        <!-- Daily Forecast -->
+        <div class="forecast-section">
+          <h3>Próximos Dias</h3>
+          <div class="daily-container" id="daily-forecast">
+            <!-- Items injected by JS -->
           </div>
         </div>
       </div>

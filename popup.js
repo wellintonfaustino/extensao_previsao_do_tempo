@@ -28,14 +28,19 @@ const dom = {
   cityName: document.getElementById('city-name'),
   temperature: document.getElementById('temperature'),
   condition: document.getElementById('condition'),
-  weatherIcon: document.querySelector('.weather-icon'), // querySelector é mais seguro aqui
+  weatherIcon: document.querySelector('.weather-icon'),
   windSpeed: document.getElementById('wind-speed'),
   humidity: document.getElementById('humidity'),
+  precipProb: document.getElementById('precip-prob'), // Novo
+  todayDate: document.getElementById('today-date'), // Novo
   loading: document.getElementById('loading'),
   content: document.getElementById('weather-content'),
   error: document.getElementById('error-msg'),
-  errorText: document.getElementById('error-text'), // Corrigido ID no HTML se precisar
-  retryBtn: document.getElementById('retry-btn') // Corrigido ID no HTML se precisar
+  errorText: document.getElementById('error-text'),
+  retryBtn: document.getElementById('retry-btn'),
+  hourlyContainer: document.getElementById('hourly-forecast'),
+  dailyContainer: document.getElementById('daily-forecast'),
+  chartCanvas: document.getElementById('tempChart') // Novo
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -138,7 +143,7 @@ async function handleSearch() {
 
 async function fetchWeather(lat, lon, name) {
   try {
-    const url = `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&wind_speed_unit=kmh`;
+    const url = `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&wind_speed_unit=kmh&timezone=auto`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error("API Error");
@@ -147,19 +152,34 @@ async function fetchWeather(lat, lon, name) {
     const current = data.current;
 
     dom.cityName.textContent = name;
-    dom.temperature.textContent = Math.round(current.temperature_2m);
-    dom.windSpeed.textContent = `${current.wind_speed_10m} km/h`;
+    
+    // Atualizar data de hoje
+    const now = new Date();
+    dom.todayDate.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    dom.temperature.textContent = `${Math.round(current.temperature_2m)}°`; // Removido span unit separado
+    dom.windSpeed.textContent = `${Math.round(current.wind_speed_10m)} km/h`;
     dom.humidity.textContent = `${current.relative_humidity_2m}%`;
 
+    // Pegar probabilidade de chuva atual (da hora atual)
+    const currentHourIndex = data.hourly.time.findIndex(t => t === current.time);
+    const rainProb = currentHourIndex !== -1 ? data.hourly.precipitation_probability[currentHourIndex] : 0;
+    dom.precipProb.textContent = `${rainProb}%`;
+
     const code = current.weather_code;
-    // Fallback seguro se o código não existir
     const weatherInfo = weatherCodes[code] || { desc: "Desconhecido", icon: "fa-question" };
     
     dom.condition.textContent = weatherInfo.desc;
     
-    // Remover classes antigas e adicionar novas
     dom.weatherIcon.className = ''; 
     dom.weatherIcon.classList.add('fa-solid', weatherInfo.icon, 'weather-icon');
+
+    // Render forecasts
+    if (data.hourly) {
+        renderHourlyForecast(data.hourly, current.time);
+        drawTemperatureChart(data.hourly, current.time); // Desenhar gráfico
+    }
+    if (data.daily) renderDailyForecast(data.daily);
 
     showContent();
   } catch (err) {
@@ -188,4 +208,201 @@ function showError(msg) {
     const txt = dom.error.querySelector('p') || document.getElementById('error-text'); // Fallback seguro
     if(txt) txt.textContent = msg;
   }
+}
+
+function renderHourlyForecast(hourly, currentTime) {
+  if (!dom.hourlyContainer) return;
+  dom.hourlyContainer.innerHTML = '';
+  
+  // Find start index based on current time from API
+  const startIndex = hourly.time.findIndex(t => t === currentTime);
+  const start = startIndex !== -1 ? startIndex : 0;
+  
+  for (let i = start; i < start + 24 && i < hourly.time.length; i++) {
+    const timeStr = hourly.time[i];
+    const date = new Date(timeStr);
+    
+    // Check if valid date
+    if (isNaN(date.getTime())) continue;
+
+    const temp = Math.round(hourly.temperature_2m[i]);
+    const code = hourly.weather_code[i];
+    const precip = hourly.precipitation_probability[i];
+    const icon = (weatherCodes[code] || { icon: "fa-question" }).icon;
+    
+    const hourLabel = date.getHours().toString().padStart(2, '0') + ':00';
+    
+    const card = document.createElement('div');
+    card.className = 'hourly-card';
+    card.innerHTML = `
+      <span class="hourly-time">${i === start ? 'Agora' : hourLabel}</span>
+      <i class="fa-solid ${icon} hourly-icon"></i>
+      <span class="hourly-temp">${temp}°</span>
+      <div class="hourly-precip">
+        <i class="fa-solid fa-droplet" style="font-size: 8px;"></i>
+        <span>${precip}%</span>
+      </div>
+    `;
+    
+    dom.hourlyContainer.appendChild(card);
+  }
+}
+
+function renderDailyForecast(daily) {
+  if (!dom.dailyContainer) return;
+  dom.dailyContainer.innerHTML = '';
+  
+  for (let i = 0; i < daily.time.length; i++) {
+    const timeStr = daily.time[i];
+    // Create date relative to local time to avoid timezone shifts
+    const [year, month, day] = timeStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    
+    const maxTemp = Math.round(daily.temperature_2m_max[i]);
+    const minTemp = Math.round(daily.temperature_2m_min[i]);
+    const code = daily.weather_code[i];
+    const precip = daily.precipitation_probability_max[i];
+    const icon = (weatherCodes[code] || { icon: "fa-question" }).icon;
+    
+    const dayName = i === 0 ? 'Hoje' : date.toLocaleDateString('pt-BR', { weekday: 'long' });
+    const dateFormatted = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+    const row = document.createElement('div');
+    row.className = 'daily-card';
+    row.innerHTML = `
+      <div class="daily-day-wrapper">
+        <span class="daily-day" style="text-transform: capitalize;">${dayName}</span>
+        <span class="daily-date-sub">${dateFormatted}</span>
+      </div>
+      
+      <div class="daily-precip">
+        <i class="fa-solid fa-droplet" style="font-size: 10px;"></i>
+        <span>${precip}%</span> 
+      </div>
+
+      <div class="daily-icon-wrapper">
+        <i class="fa-solid ${icon} daily-icon"></i>
+      </div>
+      
+      <div class="daily-temps">
+        <span class="temp-max">${maxTemp}°</span>
+        <span class="temp-min">${minTemp}°</span>
+      </div>
+    `;
+    
+    dom.dailyContainer.appendChild(row);
+  }
+}
+
+/**
+ * Desenha um gráfico de temperatura suave usando Canvas API
+ */
+function drawTemperatureChart(hourly, currentTime) {
+    const canvas = dom.chartCanvas;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    
+    // Ajustar resolução para telas retina/high-dpi
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    ctx.scale(dpr, dpr);
+    
+    // Configurar dimensões internas
+    const width = rect.width;
+    const height = rect.height;
+    const padding = { top: 20, bottom: 20, left: 10, right: 10 };
+    
+    // Limpar
+    ctx.clearRect(0, 0, width, height);
+
+    // Preparar dados (próximas 24h)
+    const startIndex = hourly.time.findIndex(t => t === currentTime);
+    const start = startIndex !== -1 ? startIndex : 0;
+    const sliceCount = 24;
+    const temps = hourly.temperature_2m.slice(start, start + sliceCount);
+    
+    if (temps.length < 2) return;
+
+    // Calcular min/max para escala Y
+    const minTemp = Math.min(...temps) - 2;
+    const maxTemp = Math.max(...temps) + 2;
+    const tempRange = maxTemp - minTemp;
+
+    // Função auxiliar para converter X,Y em coordenadas do canvas
+    const getX = (index) => padding.left + (index / (temps.length - 1)) * (width - padding.left - padding.right);
+    const getY = (temp) => height - padding.bottom - ((temp - minTemp) / tempRange) * (height - padding.top - padding.bottom);
+
+    // Configurar estilo da linha
+    ctx.strokeStyle = '#ffd700'; // Dourado
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Criar gradiente de preenchimento
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+    gradient.addColorStop(1, 'rgba(255, 215, 0, 0.0)');
+
+    // Iniciar caminho
+    ctx.beginPath();
+    
+    // Desenhar curva suave (Spline simples)
+    // Para simplificar, vamos desenhar linhas retas conectadas, ou b-spline
+    // Sendo JS puro, vamos usar lines mesmo, mas com strokeCurve depois se der
+    // Tentar quadraticCurveTo para suavizar
+    
+    ctx.moveTo(getX(0), getY(temps[0]));
+
+    for (let i = 0; i < temps.length - 1; i++) {
+        const xCurrent = getX(i);
+        const yCurrent = getY(temps[i]);
+        const xNext = getX(i + 1);
+        const yNext = getY(temps[i + 1]);
+        
+        // Ponto de controle para curva suave (ponto médio)
+        const xMid = (xCurrent + xNext) / 2;
+        const yMid = (yCurrent + yNext) / 2;
+        
+        if (i === 0) {
+           ctx.lineTo(xMid, yMid); // Line to first mid
+        } else {
+           ctx.quadraticCurveTo(xCurrent, yCurrent, xMid, yMid);
+        }
+    }
+    
+    // Último ponto
+    ctx.lineTo(getX(temps.length - 1), getY(temps[temps.length - 1]));
+    
+    // Desenhar a linha
+    ctx.stroke();
+    
+    // Preencher a área abaixo
+    ctx.lineTo(getX(temps.length - 1), height);
+    ctx.lineTo(getX(0), height);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Desenhar bolinhas em alguns pontos (a cada 4 horas)
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < temps.length; i += 4) {
+        const x = getX(i);
+        const y = getY(temps[i]);
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Texto da temperatura
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${temps[i]}°`, x, y - 8);
+        ctx.fillStyle = '#fff';
+    }
 }
