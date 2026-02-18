@@ -222,8 +222,16 @@ function renderHourlyForecast(hourly, currentTime) {
   if (!dom.hourlyContainer) return;
   dom.hourlyContainer.innerHTML = '';
   
-  // Find start index based on current time from API
-  const startIndex = hourly.time.findIndex(t => t === currentTime);
+  // Find start index based on current system time (more robust than API current.time)
+  const now = new Date();
+  const currentHour = now.getHours();
+  // As datas da API vêm como string ISO local "YYYY-MM-DDTHH:mm" devido ao timezone=auto
+  // Vamos achar o índice onde a hora bate com a hora atual (ou a próxima)
+  const startIndex = hourly.time.findIndex(t => {
+      const date = new Date(t);
+      return date.getHours() === currentHour && date.getDate() === now.getDate();
+  });
+  
   const start = startIndex !== -1 ? startIndex : 0;
   
   for (let i = start; i < start + 24 && i < hourly.time.length; i++) {
@@ -329,8 +337,13 @@ function drawTemperatureChart(hourly, currentTime) {
     // Limpar
     ctx.clearRect(0, 0, width, height);
 
-    // Preparar dados (próximas 24h)
-    const startIndex = hourly.time.findIndex(t => t === currentTime);
+    // Basear no horário do sistema para garantir que começa "Agora"
+    const now = new Date();
+    const currentHour = now.getHours();
+    const startIndex = hourly.time.findIndex(t => {
+      const date = new Date(t);
+      return date.getHours() === currentHour && date.getDate() === now.getDate();
+    });
     const start = startIndex !== -1 ? startIndex : 0;
     const sliceCount = 24;
     const temps = hourly.temperature_2m.slice(start, start + sliceCount);
@@ -440,8 +453,15 @@ function drawRainChart(hourly, currentTime) {
     
     ctx.clearRect(0, 0, width, height);
 
-    // Dados (24h)
-    const startIndex = hourly.time.findIndex(t => t === currentTime);
+    // Dados (24h) partindo da hora atual do sistema
+    const now = new Date();
+    const currentHour = now.getHours();
+    const startIndex = hourly.time.findIndex(t => {
+      const date = new Date(t);
+      return date.getHours() === currentHour && date.getDate() === now.getDate();
+    });
+    
+    // Se não achar (final do dia?), pega o último ou 0
     const start = startIndex !== -1 ? startIndex : 0;
     const sliceCount = 24;
     const props = hourly.precipitation_probability.slice(start, start + sliceCount);
@@ -489,6 +509,11 @@ function drawRainChart(hourly, currentTime) {
         ctx.fillText(`${hour}h`, x, height - 5);
         
         // Valor se for relevante (>30%)
+        if(props[i] > 20) {
+           ctx.fillText(`${props[i]}%`, x, height - padding.bottom - (props[i]/100 * (height - padding.top - padding.bottom)) - 5); 
+        }
+    }
+
     // Interatividade: Tooltip
     // Remover ouvintes antigos para evitar duplicação (embora redefinir onmousemove funcione bem)
     canvas.onmousemove = (e) => {
